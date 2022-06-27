@@ -1,6 +1,7 @@
 /*
 *   Nas operações de post, patch e delete colocar um where na query para que só usuarios do tipo admim possam acessar aquele endpoint  
 *   Tratar caso o usuário não tenha nenhum autor
+*   Mudar nomes das rotas para um mais descritivo
 */
 
 
@@ -84,7 +85,7 @@ app.patch('/author/:user_id/:author_id', async (req,res) => {
         return res.status(400).send(err)
     }
 })
-//Deleta autor
+//Deleta autor {Só admin}
 app.delete('/author/:user_id/:author_id', async (req, res) => {
     const { user_id, author_id } = req.params
     try {
@@ -113,10 +114,19 @@ app.post('/paper/:user_id/:author_id', async (req, res) => {
     }
 })
 
-//Atualiza paper por autor
-
 
 //Mostra todos os papers de um autor
+app.get('/papers/:author_id', async (req, res) => {
+    const { author_id } = req.params
+    try {
+        const allPapers = await pool.query('SELECT * FROM papers WHERE author_id = ($1)', [author_id])
+        return res.status(200).send(allPapers.rows)
+    } catch (err) {
+        return res.status(400).send(err)
+    }
+})
+
+//Atualiza paper por autor {Só admin}
 
 
 //Deleta paper
