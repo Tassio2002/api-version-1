@@ -78,6 +78,7 @@ app.patch('/author/:user_id/:author_id', async (req,res) => {
     try {
         const belongsToUser = await pool.query('SELECT * FROM authors WHERE user_id = ($1) AND author_id = ($2)', [user_id, author_id])
         if (!belongsToUser.rows[0]) return res.status(400).send('Operation not allowed, this author does not belong to this user.')
+        
         const updateAuthor = await pool.query('UPDATE authors SET author_name = ($1) WHERE author_id = ($2) RETURNING *', 
         [data.author_name, author_id])
         return res.status(200).send(updateAuthor.rows)
@@ -91,6 +92,7 @@ app.delete('/author/:user_id/:author_id', async (req, res) => {
     try {
         const belongsToUser = await pool.query('SELECT * FROM authors WHERE user_id = ($1) AND author_id = ($2)', [user_id, author_id])
         if (!belongsToUser.rows[0]) return res.status(400).send('Operation not allowed, this author does not belong to this user.')
+
         const deleteAuthor = await pool.query('DELETE FROM authors WHERE author_id = ($1) RETURNING *', [author_id])
         return res.status(200).send({
             message: 'author successfully deleted',
@@ -127,10 +129,38 @@ app.get('/papers/:author_id', async (req, res) => {
 })
 
 //Atualiza paper por autor {Só admin}
+//Permitir que o usuário consiga alterar apenas alguns dados
+//Verificar se o autor existe no banco de dados em caso de o usuário querer atualizar o autor
+app.patch('/paper/:user_id/:author_id/:paper_id', async (req,res) => {
+    const { author_id, paper_id } = req.params
+    const data = req.body
+    try {
+        const belongsToUser = await pool.query('SELECT * FROM papers WHERE author_id = ($1) AND paper_id = ($2)', [author_id, paper_id])
+        if (!belongsToUser.rows[0]) return res.status(400).send('Operation not allowed, this paper does not belong to this author.')
 
+        const updatePaper = await pool.query('UPDATE papers SET paper_title = ($1), paper_summary = ($2), author_id = ($3) WHERE paper_id = ($4) RETURNING *', 
+        [data.paper_title, data.paper_summary, data.author_id, paper_id])
+        
+        return res.status(200).send(updatePaper.rows)
+    } catch (err) {
+        return res.status(400).send(err)
+    }
+})
 
 //Deleta paper
-
-
+app.delete('/paper/:user_id/:author_id/:paper_id', async (req, res) => {
+    const { author_id, paper_id } = req.params
+    try {
+        const belongsToUser = await pool.query('SELECT * FROM papers WHERE author_id = ($1) AND paper_id = ($2)', [author_id, paper_id])
+        if (!belongsToUser.rows[0]) return res.status(400).send('Operation not allowed, this paper does not belong to this author.')
+        const deletePaper = await pool.query('DELETE FROM papers WHERE paper_id = ($1) RETURNING *', [paper_id])
+        return res.status(200).send({
+            message: 'paper successfully deleted',
+            deletePaper
+        })
+    } catch (err) {
+        return res.status(400).send(err)
+    }
+})
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
