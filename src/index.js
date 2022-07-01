@@ -8,7 +8,9 @@
 const express = require('express')
 const cors = require('cors')
 const { Pool } = require('pg')
+
 require('dotenv').config()
+const jwt = require('jsonwebtoken')
 
 const PORT = 3333
 
@@ -21,6 +23,33 @@ app.use(cors())
 const pool = new Pool({
     connectionString: process.env.POSTGRES_URL
 })
+
+function verifyJWT(req, res, next) {
+    const token = req.headers['x-access-token']
+
+    if(!token) return res.status(401).json({ auth: false, message: 'No token porvided.' })
+
+    jwt.verify(token, process.env.SECRET, function(err, decoded) {
+        if(err) return res.status(500).json({ auth: false, message: 'Failed to authenticate token' })
+    })
+
+    req.userID = decoded.id
+    next()
+}
+
+//login
+app.post('/login', (req, res) => {
+    if(req.body.user_email === "admin@gmail.com" && req.body.password === "admin123456") {
+        const { user_id } = req.body
+        const token = jwt.sign({user_id}, process.env.SECRET, {
+            expiresIn: 60
+        })
+        return res.json({ auth: true, token: token })
+    }
+
+    res.status(500).json({message: "Login inválido"})
+})
+
 //Endpoint raiz
 app.get('/', (req, res) => {console.log('Olá node')})
 //Pega todos os usuários
@@ -61,7 +90,7 @@ app.post('/authors/:user_id', async (req, res) => {
     }
 })
 //Pega todos os autores de um id especifico
-app.get('/authors/:user_id', async (req, res) => {
+app.get('/authors/:user_id', verifyJWT, async (req, res) => {
     const { user_id } = req.params
     try {
         const allAuthors = await pool.query('SELECT * FROM authors WHERE user_id = ($1)', [user_id])
