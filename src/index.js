@@ -51,7 +51,8 @@ app.post('/login', (req, res) => {
 
 //Endpoint raiz
 app.get('/', (req, res) => {console.log('Olá node')})
-//Pega todos os usuários
+
+//Pega todos os usuários {só host}
 app.get('/users', async (req, res) => {
     try {
         const { rows } = await pool.query('SELECT * FROM users')
@@ -60,6 +61,7 @@ app.get('/users', async (req, res) => {
         return res.status(400).send(err)
     }
 })
+
 //Cria um novo usuário caso o email não esteja cadastrado anteriormente
 app.post('/signup', async (req, res) => {
     const { user_type } = req.body
@@ -77,17 +79,48 @@ app.post('/signup', async (req, res) => {
         return res.status(400).send(err)
     }
 })
-//Cria um novo author {Só admin}
-app.post('/authors/:user_id',verifyJWT, async (req, res) => {
-    const { author_name } = req.body
-    const { user_id } = req.body
+
+//Criar uma função
+app.get('/test/:user_id', async (req, res) => {
+    const {user_id} = req.params
     try {
-    const newAuthor = await pool.query('INSERT INTO authors (author_name, user_id) VALUES ($1, $2) RETURNING *', [author_name, user_id])
-    return res.status(200).send(newAuthor.rows)
+        const test = await pool.query('SELECT user_type FROM users WHERE user_id = ($1)', [user_id])
+        res.status(200).send(test.rows)
+
+        if (test.rows[0].user_type == "admin") {
+            return console.log('funcionou')
+        } else {
+            return console.log(test.rows[0])
+        }
     } catch (err) {
         return res.status(400).send(err)
     }
 })
+//Cria um novo author {Só admin}
+app.post('/authors/:user_id',verifyJWT, async (req, res) => {
+    const {user_id} = req.params
+
+    try {
+        const headerUserId = await pool.query('SELECT user_type FROM users WHERE user_id = ($1)', [user_id])
+            
+        if (headerUserId.rows[0].user_type == "admin") {
+            const { author_name } = req.body
+            const { user_id } = req.body
+            const newAuthor = await pool.query('INSERT INTO authors (author_name, user_id) VALUES ($1, $2) RETURNING *', [author_name, user_id])
+            return res.status(200).send(newAuthor.rows)
+        } else {
+            return res.status(500).send({
+            message: 'This operation is only authorized for admin users.'
+            })
+        }
+    } catch (err) {
+        return res.status(500).send({
+        message: ''
+    })
+ 
+}
+})
+
 //Pega todos os autores de um id especifico
 app.get('/authors/:user_id', verifyJWT, async (req, res) => {
     const { user_id } = req.params
@@ -98,6 +131,8 @@ app.get('/authors/:user_id', verifyJWT, async (req, res) => {
         return res.status(400).send(err)
     }
 })
+
+
 //Atualiza author {Só admin}
 //Fazer apenas uma query
 app.patch('/author/:user_id/:author_id', verifyJWT, async (req,res) => {
@@ -114,6 +149,7 @@ app.patch('/author/:user_id/:author_id', verifyJWT, async (req,res) => {
         return res.status(400).send(err)
     }
 })
+
 //Deleta autor {Só admin}
 app.delete('/author/:user_id/:author_id', verifyJWT, async (req, res) => {
     const { user_id, author_id } = req.params
@@ -143,7 +179,6 @@ app.post('/paper/:user_id/:author_id', verifyJWT, async (req, res) => {
         return res.status(400).send(err)
     }
 })
-
 
 //Mostra todos os papers de um autor
 app.get('/papers/:author_id', verifyJWT, async (req, res) => {
