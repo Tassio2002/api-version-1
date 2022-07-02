@@ -27,14 +27,13 @@ const pool = new Pool({
 function verifyJWT(req, res, next) {
     const token = req.headers['x-access-token']
 
-    if(!token) return res.status(401).json({ auth: false, message: 'No token porvided.' })
+    if(!token) return res.status(401).json({ auth: false, message: 'No token provided.' })
 
     jwt.verify(token, process.env.SECRET, function(err, decoded) {
         if(err) return res.status(500).json({ auth: false, message: 'Failed to authenticate token' })
+        req.user_id = decoded.id
+        next()
     })
-
-    req.userID = decoded.id
-    next()
 }
 
 //login
@@ -42,7 +41,7 @@ app.post('/login', (req, res) => {
     if(req.body.user_email === "admin@gmail.com" && req.body.password === "admin123456") {
         const { user_id } = req.body
         const token = jwt.sign({user_id}, process.env.SECRET, {
-            expiresIn: 60
+            expiresIn: 900
         })
         return res.json({ auth: true, token: token })
     }
@@ -61,8 +60,8 @@ app.get('/users', async (req, res) => {
         return res.status(400).send(err)
     }
 })
-//Cria um novo usuário caso o email não esteja cadastrado anteriormente {Só admin}
-app.post('/session', async (req, res) => {
+//Cria um novo usuário caso o email não esteja cadastrado anteriormente
+app.post('/signup', async (req, res) => {
     const { user_type } = req.body
     const { user_email } = req.body
     const { password } = req.body
@@ -79,7 +78,7 @@ app.post('/session', async (req, res) => {
     }
 })
 //Cria um novo author {Só admin}
-app.post('/authors/:user_id', async (req, res) => {
+app.post('/authors/:user_id',verifyJWT, async (req, res) => {
     const { author_name } = req.body
     const { user_id } = req.body
     try {
@@ -101,7 +100,7 @@ app.get('/authors/:user_id', verifyJWT, async (req, res) => {
 })
 //Atualiza author {Só admin}
 //Fazer apenas uma query
-app.patch('/author/:user_id/:author_id', async (req,res) => {
+app.patch('/author/:user_id/:author_id', verifyJWT, async (req,res) => {
     const { user_id, author_id } = req.params
     const data = req.body
     try {
@@ -116,7 +115,7 @@ app.patch('/author/:user_id/:author_id', async (req,res) => {
     }
 })
 //Deleta autor {Só admin}
-app.delete('/author/:user_id/:author_id', async (req, res) => {
+app.delete('/author/:user_id/:author_id', verifyJWT, async (req, res) => {
     const { user_id, author_id } = req.params
     try {
         const belongsToUser = await pool.query('SELECT * FROM authors WHERE user_id = ($1) AND author_id = ($2)', [user_id, author_id])
@@ -133,7 +132,7 @@ app.delete('/author/:user_id/:author_id', async (req, res) => {
 })
 
 //Cria paper por autor {Só admin}
-app.post('/paper/:user_id/:author_id', async (req, res) => {
+app.post('/paper/:user_id/:author_id', verifyJWT, async (req, res) => {
     const { paper_title, paper_summary } = req.body
     const { author_id } = req.body //trocar por author_id
     try {
@@ -147,7 +146,7 @@ app.post('/paper/:user_id/:author_id', async (req, res) => {
 
 
 //Mostra todos os papers de um autor
-app.get('/papers/:author_id', async (req, res) => {
+app.get('/papers/:author_id', verifyJWT, async (req, res) => {
     const { author_id } = req.params
     try {
         const allPapers = await pool.query('SELECT * FROM papers WHERE author_id = ($1)', [author_id])
@@ -160,7 +159,7 @@ app.get('/papers/:author_id', async (req, res) => {
 //Atualiza paper por autor {Só admin}
 //Permitir que o usuário consiga alterar apenas alguns dados
 //Verificar se o autor existe no banco de dados em caso de o usuário querer atualizar o autor
-app.patch('/paper/:user_id/:author_id/:paper_id', async (req,res) => {
+app.patch('/paper/:user_id/:author_id/:paper_id', verifyJWT, async (req,res) => {
     const { author_id, paper_id } = req.params
     const data = req.body
     try {
@@ -177,7 +176,7 @@ app.patch('/paper/:user_id/:author_id/:paper_id', async (req,res) => {
 })
 
 //Deleta paper
-app.delete('/paper/:user_id/:author_id/:paper_id', async (req, res) => {
+app.delete('/paper/:user_id/:author_id/:paper_id', verifyJWT, async (req, res) => {
     const { author_id, paper_id } = req.params
     try {
         const belongsToUser = await pool.query('SELECT * FROM papers WHERE author_id = ($1) AND paper_id = ($2)', [author_id, paper_id])
