@@ -79,14 +79,36 @@ app.post('/signup', async (req, res) => {
         return res.status(400).send(err)
     }
 })
+let isAdmin
+app.use('/authors/:user_id', async function (req, res, next) {
+    const { user_id } = req.params
+    try {
+        const userType = await pool.query('SELECT user_type FROM users WHERE user_id = ($1)', [user_id])
+
+        if (userType.rows[0].user_type == "admin") {
+            console.log('passou')
+            //isAdmin = true, next()
+            return res.status(200)
+        } else {
+            console.log('não passou')
+            //isAdmin = false, next()
+            return res.status(500).send({
+                message: 'This operation can only be done by an admin user.'
+            })
+        }
+    } catch (err) {
+        return res.status(400).send(err)
+    } 
+})
 
 //Criar uma função
+//Apagar este endpoint
 app.get('/test/:user_id', async (req, res) => {
-    const {user_id} = req.params
+    const { user_id } = req.params
     try {
         const test = await pool.query('SELECT user_type FROM users WHERE user_id = ($1)', [user_id])
         res.status(200).send(test.rows)
-
+        
         if (test.rows[0].user_type == "admin") {
             return console.log('funcionou')
         } else {
@@ -98,28 +120,22 @@ app.get('/test/:user_id', async (req, res) => {
 })
 //Cria um novo author {Só admin}
 app.post('/authors/:user_id',verifyJWT, async (req, res) => {
-    const {user_id} = req.params
-
-    try {
-        const headerUserId = await pool.query('SELECT user_type FROM users WHERE user_id = ($1)', [user_id])
-            
-        if (headerUserId.rows[0].user_type == "admin") {
+    const { user_id } = req.params
+    try { 
             const { author_name } = req.body
             const { user_id } = req.body
             const newAuthor = await pool.query('INSERT INTO authors (author_name, user_id) VALUES ($1, $2) RETURNING *', [author_name, user_id])
+
             return res.status(200).send(newAuthor.rows)
-        } else {
-            return res.status(500).send({
-            message: 'This operation is only authorized for admin users.'
-            })
-        }
+
+        
     } catch (err) {
         return res.status(500).send({
         message: ''
     })
- 
 }
 })
+
 
 //Pega todos os autores de um id especifico
 app.get('/authors/:user_id', verifyJWT, async (req, res) => {
