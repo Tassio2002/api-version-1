@@ -2,11 +2,13 @@
 *   Nas operações de post, patch e delete colocar um where na query para que só usuarios do tipo admim possam acessar aquele endpoint  
 *   Tratar caso o usuário não tenha nenhum autor
 *   Mudar nomes das rotas para um mais descritivo
+*   Limpar variaveis e parametros não utilizados
 */
 
 
 const express = require('express')
 const cors = require('cors')
+var router = express.Router();
 const { Pool } = require('pg')
 
 require('dotenv').config()
@@ -49,9 +51,6 @@ app.post('/login', (req, res) => {
     res.status(500).json({ message: "Login inválido" })
 })
 
-//Endpoint raiz
-app.get('/', (req, res) => { console.log('Olá node') })
-
 //Pega todos os usuários {só host}
 app.get('/users', async (req, res) => {
     try {
@@ -79,8 +78,8 @@ app.post('/signup', async (req, res) => {
         return res.status(400).send(err)
     }
 })
-
-app.use('/authors/user/:user_id', async function (req, res, next) {
+let route = ['/authors/:user_id', '/author/:user_id/:author_id', '/paper/:user_id/:author_id', '/papers/:author_id', '/paper/:user_id/:author_id/:paper_id']
+app.use(route, async function (req, res, next) {
     const { user_id } = req.params
     try {
         const userType = await pool.query('SELECT user_type FROM users WHERE user_id = ($1)', [user_id])
@@ -95,12 +94,14 @@ app.use('/authors/user/:user_id', async function (req, res, next) {
             })
         }
     } catch (err) {
-        return res.status(400).send(err)
+        return res.status(500).send({
+            message: 'This user type does not belong to the system'
+        })
     }
 })
 
 //Cria um novo author {Só admin}
-app.post('/authors/user/:user_id', verifyJWT, async (req, res) => {
+app.post('/authors/:user_id', verifyJWT, async (req, res) => {
     const { user_id } = req.params//apagar
     try {
         const { author_name } = req.body
@@ -117,7 +118,7 @@ app.post('/authors/user/:user_id', verifyJWT, async (req, res) => {
 
 
 //Pega todos os autores de um id especifico
-app.get('/authors/user/:user_id', verifyJWT, async (req, res) => {
+app.get('/authors/:user_id', verifyJWT, async (req, res) => {
     const { user_id } = req.params
     try {
         const allAuthors = await pool.query('SELECT * FROM authors WHERE user_id = ($1)', [user_id])
