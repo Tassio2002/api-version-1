@@ -78,14 +78,15 @@ app.post('/signup', async (req, res) => {
         return res.status(400).send(err)
     }
 })
-let route = ['/authors/:user_id', '/author/:user_id/:author_id', '/paper/:user_id/:author_id', '/papers/:author_id', '/paper/:user_id/:author_id/:paper_id']
+
+let route = ['/authors/:user_id', '/author/:user_id/:author_id', '/paper/:user_id/:author_id', '/papers/:user_id/:author_id', '/paper/:user_id/:author_id/:paper_id']
 app.use(route, async function (req, res, next) {
     const { user_id } = req.params
     try {
         const userType = await pool.query('SELECT user_type FROM users WHERE user_id = ($1)', [user_id])
 
         if (userType.rows[0].user_type == "admin") {
-            console.log('passou')
+            console.log('Passou')
             return res.status(200), next()
         } else {
             console.log('não passou')
@@ -115,7 +116,6 @@ app.post('/authors/:user_id', verifyJWT, async (req, res) => {
         })
     }
 })
-
 
 //Pega todos os autores de um id especifico
 app.get('/authors/:user_id', verifyJWT, async (req, res) => {
@@ -165,11 +165,11 @@ app.delete('/author/:user_id/:author_id', verifyJWT, async (req, res) => {
 
 //Cria paper por autor {Só admin}
 app.post('/paper/:user_id/:author_id', verifyJWT, async (req, res) => {
-    const { paper_title, paper_summary } = req.body
-    const { author_id } = req.body //trocar por author_id
+    const { paper_title, paper_summary, author_id, user_id } = req.body
+
     try {
-        const newPaper = await pool.query('INSERT INTO papers (paper_title, paper_summary, author_id) VALUES ($1, $2, $3) RETURNING *',
-            [paper_title, paper_summary, author_id])
+        const newPaper = await pool.query('INSERT INTO papers (paper_title, paper_summary, author_id, user_id) VALUES ($1, $2, $3, $4) RETURNING *',
+            [paper_title, paper_summary, author_id, user_id])
         return res.status(200).send(newPaper.rows)
     } catch (err) {
         return res.status(400).send(err)
@@ -177,10 +177,11 @@ app.post('/paper/:user_id/:author_id', verifyJWT, async (req, res) => {
 })
 
 //Mostra todos os papers de um autor
-app.get('/papers/:author_id', verifyJWT, async (req, res) => {
+app.get('/papers/:user_id/:author_id', verifyJWT, async (req, res) => {
+    const { user_id } = req.params
     const { author_id } = req.params
     try {
-        const allPapers = await pool.query('SELECT * FROM papers WHERE author_id = ($1)', [author_id])
+        const allPapers = await pool.query('SELECT * FROM papers WHERE user_id = ($1) AND author_id = ($2)', [user_id, author_id])
         return res.status(200).send(allPapers.rows)
     } catch (err) {
         return res.status(400).send(err)
@@ -219,6 +220,34 @@ app.delete('/paper/:user_id/:author_id/:paper_id', verifyJWT, async (req, res) =
         })
     } catch (err) {
         return res.status(400).send(err)
+    }
+})
+
+
+//adicionar verifyJWT
+//Tratar o caso de não ter nenhum autor para mostrar com rows.lenght = 0
+app.get('/search/author', async (req, res) => {
+    const { author_search } = req.body
+
+    try {
+        const search = await pool.query('SELECT * FROM authors WHERE author_name = ($1)', [author_search])
+        return res.status(200).send(search.rows)
+    } catch (err) {
+        console.log('não achou')
+        return res.status(500).send(err)
+    }
+})
+//adicionar verifyJWT
+//Tratar o caso de não ter nenhum autor para mostrar com rows.lenght = 0
+app.get('/search/paper', async (req, res) => {
+    const { paper_search } = req.body
+
+    try {
+        const search = await pool.query('SELECT * FROM papers WHERE paper_title = ($1)', [paper_search])
+        return res.status(200).send(search.rows)
+    } catch (err) {
+        console.log('não achou')
+        return res.status(500).send(err)
     }
 })
 
