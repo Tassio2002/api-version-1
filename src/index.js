@@ -38,17 +38,80 @@ function verifyJWT(req, res, next) {
     })
 }
 
+const expirationTime = 10800
+let timeLeft = expirationTime
+//Converte um numero inteiro em uma string formatada no formato HH:MM:SS
+function convertSecondsToTime(time) {
+    let dateOBJ = new Date(time * 1000),
+        hours = dateOBJ.getUTCHours(),
+        minutes = dateOBJ.getUTCMinutes(),
+        seconds = dateOBJ.getUTCSeconds(),
+        convertString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+    return convertString
+}
+
+//Pega o tempo de expiração da chave de API e faz uma contagem regressiva
+let interval = setInterval(() => {
+    timeLeft -= 1
+    
+    if (timeLeft <= 0) {clearInterval(interval)}
+    convertSecondsToTime()
+     
+    console.log("format: " + convertSecondsToTime(timeLeft))//apagar
+}, 1000)
+
+//Para fazer o patch é preciso enviar todos as colunas da tabela
+app.patch('/profile2/:user_id', async (req, res) => {
+    const { user_id } = req.params
+    const {user_type, user_email, password} = req.body
+    const {expirationTimeLeft} = convertSecondsToTime(timeLeft)
+    try {
+        const updateSessionExpiration = await pool.query('UPDATE users SET user_type, user_email, password, session_expiration = ($1, $2, $3, $4) WHERE author_id = ($5) RETURNING *',
+            [user_type, user_email, password, expirationTimeLeft, user_id])
+        return res.status(200).send(updateSessionExpiration.rows)
+    } catch (err) {
+        return res.status(400).send(err)
+    }
+})
+//Cria um novo usuário caso o email não esteja cadastrado anteriormente
+app.post('/signup', async (req, res) => {
+    const { user_type } = req.body
+    const { user_email } = req.body
+    const { password } = req.body
+    let user = ''
+    try {
+        user = await pool.query('SELECT * FROM users WHERE user_email = ($1)', [user_email])
+        if (!user.rows[0]) {
+            user = await pool.query('INSERT INTO users (user_type, user_email, password, session_expiration) VALUES ($1, $2, $3, $4) RETURNING *', [user_type, user_email, password, convertSecondsToTime(expirationTime)])
+        }
+        return res.status(200).send(user.rows)
+    } catch (err) {
+        return res.status(400).send(err)
+    }
+})
+
 //login
+// colocar o user_email e a password em variáveis
 app.post('/login', (req, res) => {
     if (req.body.user_email === "admin@gmail.com" && req.body.password === "admin123456") {
         const { user_id } = req.body
         const token = jwt.sign({ user_id }, process.env.SECRET, {
-            expiresIn: 1600
+            expiresIn: expirationTime
         })
         return res.json({ auth: true, token: token })
     }
 
     res.status(500).json({ message: "Login inválido" })
+})
+
+app.get('/profile/:user_id', async (req, res) => {
+    const { user_id } = req.params
+    try {
+        const profile = await pool.query('SELECT * FROM users WHERE user_id = ($1)', [user_id])
+        return res.status(200).send(profile.rows)
+    } catch (err) {
+        return res.status(500).send(err)
+    }
 })
 
 //Pega todos os usuários {só host}
@@ -61,24 +124,7 @@ app.get('/users', async (req, res) => {
     }
 })
 
-//Cria um novo usuário caso o email não esteja cadastrado anteriormente
-app.post('/signup', async (req, res) => {
-    const { user_type } = req.body
-    const { user_email } = req.body
-    const { password } = req.body
-    const { session_expiration } = req.body
-    let user = ''
-    try {
-        user = await pool.query('SELECT * FROM users WHERE user_email = ($1)', [user_email])
-        if (!user.rows[0]) {
-            user = await pool.query('INSERT INTO users (user_type, user_email, password, session_expiration) VALUES ($1, $2, $3, $4) RETURNING *', [user_type, user_email, password, session_expiration])
-        }
-        return res.status(200).send(user.rows)
-    } catch (err) {
-        return res.status(400).send(err)
-    }
-})
-
+//Get all user pode ser usado por default
 let route = ['/authors/:user_id', '/author/:user_id/:author_id', '/paper/:user_id/:author_id', '/papers/:user_id/:author_id', '/paper/:user_id/:author_id/:paper_id']
 app.use(route, async function (req, res, next) {
     const { user_id } = req.params
@@ -86,10 +132,8 @@ app.use(route, async function (req, res, next) {
         const userType = await pool.query('SELECT user_type FROM users WHERE user_id = ($1)', [user_id])
 
         if (userType.rows[0].user_type == "admin") {
-            console.log('Passou')
             return res.status(200), next()
         } else {
-            console.log('não passou')
             return res.status(500).send({
                 message: 'This operation can only be done by an admin user.'
             })
@@ -165,7 +209,7 @@ app.delete('/author/:user_id/:author_id', verifyJWT, async (req, res) => {
 
 //Cria paper por autor {Só admin}
 app.post('/paper/:user_id/:author_id', verifyJWT, async (req, res) => {
-    const { paper_title, paper_summary, author_id, user_id } = req.body
+    const { paper_title, paper_summary, author_id, user_id } = req.body//Colocar todos nesse formato
 
     try {
         const newPaper = await pool.query('INSERT INTO papers (paper_title, paper_summary, author_id, user_id) VALUES ($1, $2, $3, $4) RETURNING *',
@@ -189,6 +233,7 @@ app.get('/papers/:user_id/:author_id', verifyJWT, async (req, res) => {
 })
 
 //Atualiza paper por autor {Só admin}
+//Não precisa mandar o author id no body da requisição
 //Permitir que o usuário consiga alterar apenas alguns dados
 //Verificar se o autor existe no banco de dados em caso de o usuário querer atualizar o autor
 app.patch('/paper/:user_id/:author_id/:paper_id', verifyJWT, async (req, res) => {
@@ -246,9 +291,10 @@ app.get('/search/paper', async (req, res) => {
         const search = await pool.query('SELECT * FROM papers WHERE paper_title = ($1)', [paper_search])
         return res.status(200).send(search.rows)
     } catch (err) {
-        console.log('não achou')
         return res.status(500).send(err)
     }
 })
+
+
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
