@@ -169,7 +169,11 @@ app.get('/authors/:user_id', verifyJWT, async (req, res) => {
     const { user_id } = req.params
     try {
         const allAuthors = await pool.query('SELECT * FROM authors WHERE user_id = ($1)', [user_id])
-        return res.status(200).send(allAuthors.rows)
+        if (!allAuthors.rows[0]) {
+            return res.status(400).send({message: 'This user has no authors'})
+        } else {
+            return res.status(200).send(allAuthors.rows)
+        }
     } catch (err) {
         return res.status(400).send(err)
     }
@@ -204,7 +208,6 @@ app.delete('/author/:user_id/:author_id', verifyJWT, async (req, res) => {
 //Cria paper por autor {Só admin}
 app.post('/paper/:user_id/:author_id', verifyJWT, async (req, res) => {
     const { paper_title, paper_summary, author_id, user_id } = req.body//Colocar todos nesse formato
-
     try {
         const newPaper = await pool.query('INSERT INTO papers (paper_title, paper_summary, author_id, user_id) VALUES ($1, $2, $3, $4) RETURNING *',
             [paper_title, paper_summary, author_id, user_id])
@@ -220,7 +223,11 @@ app.get('/papers/:user_id/:author_id', verifyJWT, async (req, res) => {
     const { author_id } = req.params
     try {
         const allPapers = await pool.query('SELECT * FROM papers WHERE user_id = ($1) AND author_id = ($2)', [user_id, author_id])
-        return res.status(200).send(allPapers.rows)
+        if (!allPapers.rows[0]) {
+            return res.status(400).send({message: 'This author has no papers'})
+        } else {
+            return res.status(200).send(allPapers.rows)
+        }
     } catch (err) {
         return res.status(400).send(err)
     }
