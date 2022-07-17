@@ -45,11 +45,10 @@ function convertSecondsToTime(time) {
 //Pega o tempo de expiração da chave de API e faz uma contagem regressiva
 let interval = setInterval(() => {
     timeLeft -= 1
-    
+
     if (timeLeft <= 0) {clearInterval(interval)}
+
     convertSecondsToTime()
-     
-    console.log("format: " + convertSecondsToTime(timeLeft))//apagar
 }, 1000)
 
 //Cria um novo usuário caso o email não esteja cadastrado anteriormente
@@ -153,7 +152,6 @@ app.use(route, async function (req, res, next) {
 
 //Cria um novo author {Só admin}
 app.post('/authors/:user_id', verifyJWT, async (req, res) => {
-    const { user_id } = req.params//apagar
     try {
         const { author_name } = req.body
         const { user_id } = req.body
@@ -194,7 +192,7 @@ app.patch('/author/:user_id/:author_id', verifyJWT, async (req, res) => {
 app.delete('/author/:user_id/:author_id', verifyJWT, async (req, res) => {
     const { user_id, author_id } = req.params
     try {
-        const deleteAuthor = await pool.query('DELETE FROM authors WHERE user_id = ($1) AND author_id = ($2) RETURNING *', [user_id,author_id])
+        await pool.query('DELETE FROM authors WHERE user_id = ($1) AND author_id = ($2) RETURNING *', [user_id,author_id])
         return res.status(200).send({
             message: 'author successfully deleted'
         })
@@ -249,7 +247,7 @@ app.patch('/paper/:user_id/:author_id/:paper_id', verifyJWT, async (req, res) =>
 app.delete('/paper/:user_id/:author_id/:paper_id', verifyJWT, async (req, res) => {
     const { author_id, paper_id } = req.params
     try {
-        const deletePaper = await pool.query('DELETE FROM papers WHERE author_id = ($1) AND paper_id = ($2) RETURNING *', [author_id, paper_id])
+        await pool.query('DELETE FROM papers WHERE author_id = ($1) AND paper_id = ($2) RETURNING *', [author_id, paper_id])
         return res.status(200).send({
             message: 'paper successfully deleted'
         })
@@ -268,7 +266,6 @@ app.get('/search/author', async (req, res) => {
         const searchAuthor = await pool.query('SELECT * FROM authors WHERE author_name LIKE ($1)', [`%${author_search}%`])
         return res.status(200).send(searchAuthor.rows)
     } catch (err) {
-        console.log('não achou')
         return res.status(500).send(err)
     }
 })
