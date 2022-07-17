@@ -1,11 +1,3 @@
-/*
-*   Nas operações de post, patch e delete colocar um where na query para que só usuarios do tipo admim possam acessar aquele endpoint  
-*   Tratar caso o usuário não tenha nenhum autor
-*   Mudar nomes das rotas para um mais descritivo
-*   Limpar variaveis e parametros não utilizados
-*/
-
-
 const express = require('express')
 const cors = require('cors')
 var router = express.Router();
@@ -62,14 +54,12 @@ let interval = setInterval(() => {
 
 //Cria um novo usuário caso o email não esteja cadastrado anteriormente
 app.post('/signup', async (req, res) => {
-    const { user_type } = req.body
-    const { user_email } = req.body
-    const { password } = req.body
+    const { user_name, user_email, user_type, password } = req.body
     let user = ''
     try {
         user = await pool.query('SELECT * FROM users WHERE user_email = ($1)', [user_email])
         if (!user.rows[0]) {
-            user = await pool.query('INSERT INTO users (user_type, user_email, password, session_expiration) VALUES ($1, $2, $3, $4) RETURNING *', [user_type, user_email, password, convertSecondsToTime(expirationTime)])
+            user = await pool.query('INSERT INTO users (user_name, user_type, user_email, password, session_expiration) VALUES ($1, $2, $3, $4, $5) RETURNING *', [user_name, user_type, user_email, password, convertSecondsToTime(expirationTime)])
         }
         return res.status(200).send(user.rows)
     } catch (err) {
@@ -87,10 +77,10 @@ app.post('/login', (req, res) => {
         })
         return res.json({ auth: true, token: token })
     }
-
     res.status(500).json({ message: "Login inválido" })
 })
 
+//Vê todos os dados do usuário logado e o tempo até a expiração
 app.get('/profile/:user_id', async (req, res) => {
     const { user_id } = req.params
     try {
@@ -99,6 +89,21 @@ app.get('/profile/:user_id', async (req, res) => {
         return res.status(200).send(profile.rows)
     } catch (err) {
         return res.status(500).send(err)
+    }
+})
+
+//Deleta user
+//verifyJWT
+app.delete('/user/:user_id', async (req, res) => {
+    const { user_id } = req.params
+    try {
+        const deletePaper = await pool.query('DELETE FROM users WHERE user_id = ($1) RETURNING *', [user_id])
+        return res.status(200).send({
+            message: 'User successfully deleted',
+            deletePaper
+        })
+    } catch (err) {
+        return res.status(400).send(err)
     }
 })
 
@@ -112,13 +117,27 @@ app.get('/users', async (req, res) => {
     }
 })
 
-//Get all user pode ser usado por default
+//Só um user admin pode mudar o user type de um usario default
+//verifyJWT
+app.patch('/user/:user_id', async (req, res) => {
+    const { user_id } = req.params
+    const { user_name, user_type, password } = req.body
+
+    try {
+        const updateUser = await pool.query('UPDATE users SET user_name = ($1), user_type = ($2), password = ($3) WHERE user_id = ($4) RETURNING *', 
+            [user_name, user_type, password, user_id])
+        return res.status(200).send(updateUser.rows)
+    } catch (error) {
+        
+    }
+})
+
+//Get all user não pode ser usado por default
 let route = ['/authors/:user_id', '/author/:user_id/:author_id', '/paper/:user_id/:author_id', '/papers/:user_id/:author_id', '/paper/:user_id/:author_id/:paper_id']
 app.use(route, async function (req, res, next) {
     const { user_id } = req.params
     try {
         const userType = await pool.query('SELECT user_type FROM users WHERE user_id = ($1)', [user_id])
-
         if (userType.rows[0].user_type == "admin") {
             return res.status(200), next()
         } else {
@@ -140,7 +159,6 @@ app.post('/authors/:user_id', verifyJWT, async (req, res) => {
         const { author_name } = req.body
         const { user_id } = req.body
         const newAuthor = await pool.query('INSERT INTO authors (author_name, user_id) VALUES ($1, $2) RETURNING *', [author_name, user_id])
-
         return res.status(200).send(newAuthor.rows)
     } catch (err) {
         return res.status(500).send({
@@ -167,9 +185,6 @@ app.patch('/author/:user_id/:author_id', verifyJWT, async (req, res) => {
     const { user_id, author_id } = req.params
     const data = req.body
     try {
-        const belongsToUser = await pool.query('SELECT * FROM authors WHERE user_id = ($1) AND author_id = ($2)', [user_id, author_id])
-        if (!belongsToUser.rows[0]) return res.status(400).send('Operation not allowed, this author does not belong to this user.')
-
         const updateAuthor = await pool.query('UPDATE authors SET author_name = ($1) WHERE author_id = ($2) RETURNING *',
             [data.author_name, author_id])
         return res.status(200).send(updateAuthor.rows)
@@ -182,10 +197,7 @@ app.patch('/author/:user_id/:author_id', verifyJWT, async (req, res) => {
 app.delete('/author/:user_id/:author_id', verifyJWT, async (req, res) => {
     const { user_id, author_id } = req.params
     try {
-        const belongsToUser = await pool.query('SELECT * FROM authors WHERE user_id = ($1) AND author_id = ($2)', [user_id, author_id])
-        if (!belongsToUser.rows[0]) return res.status(400).send('Operation not allowed, this author does not belong to this user.')
-
-        const deleteAuthor = await pool.query('DELETE FROM authors WHERE author_id = ($1) RETURNING *', [author_id])
+        const deleteAuthor = await pool.query('DELETE FROM authors WHERE user_id = ($1) AND author_id = ($2) RETURNING *', [user_id,author_id])
         return res.status(200).send({
             message: 'author successfully deleted',
             deleteAuthor
@@ -226,13 +238,10 @@ app.get('/papers/:user_id/:author_id', verifyJWT, async (req, res) => {
 //Verificar se o autor existe no banco de dados em caso de o usuário querer atualizar o autor
 app.patch('/paper/:user_id/:author_id/:paper_id', verifyJWT, async (req, res) => {
     const { author_id, paper_id } = req.params
-    const data = req.body
+    const { paper_title, paper_summary } = req.body
     try {
-        const belongsToUser = await pool.query('SELECT * FROM papers WHERE author_id = ($1) AND paper_id = ($2)', [author_id, paper_id])
-        if (!belongsToUser.rows[0]) return res.status(400).send('Operation not allowed, this paper does not belong to this author.')
-
         const updatePaper = await pool.query('UPDATE papers SET paper_title = ($1), paper_summary = ($2), author_id = ($3) WHERE paper_id = ($4) RETURNING *',
-            [data.paper_title, data.paper_summary, data.author_id, paper_id])
+            [paper_title, paper_summary, author_id, paper_id])
 
         return res.status(200).send(updatePaper.rows)
     } catch (err) {
@@ -244,9 +253,7 @@ app.patch('/paper/:user_id/:author_id/:paper_id', verifyJWT, async (req, res) =>
 app.delete('/paper/:user_id/:author_id/:paper_id', verifyJWT, async (req, res) => {
     const { author_id, paper_id } = req.params
     try {
-        const belongsToUser = await pool.query('SELECT * FROM papers WHERE author_id = ($1) AND paper_id = ($2)', [author_id, paper_id])
-        if (!belongsToUser.rows[0]) return res.status(400).send('Operation not allowed, this paper does not belong to this author.')
-        const deletePaper = await pool.query('DELETE FROM papers WHERE paper_id = ($1) RETURNING *', [paper_id])
+        const deletePaper = await pool.query('DELETE FROM papers WHERE author_id = ($1) AND paper_id = ($2) RETURNING *', [author_id, paper_id])
         return res.status(200).send({
             message: 'paper successfully deleted',
             deletePaper
@@ -263,8 +270,8 @@ app.get('/search/author', async (req, res) => {
     const { author_search } = req.body
 
     try {
-        const search = await pool.query('SELECT * FROM authors WHERE author_name = ($1)', [author_search])
-        return res.status(200).send(search.rows)
+        const searchAuthor = await pool.query('SELECT * FROM authors WHERE author_name LIKE ($1)', [`%${author_search}%`])
+        return res.status(200).send(searchAuthor.rows)
     } catch (err) {
         console.log('não achou')
         return res.status(500).send(err)
@@ -276,8 +283,8 @@ app.get('/search/paper', async (req, res) => {
     const { paper_search } = req.body
 
     try {
-        const search = await pool.query('SELECT * FROM papers WHERE paper_title = ($1)', [paper_search])
-        return res.status(200).send(search.rows)
+        const searchPaper = await pool.query('SELECT * FROM papers WHERE paper_title LIKE ($1) OR paper_summary LIKE ($1)', [`%${paper_search}%`])
+        return res.status(200).send(searchPaper.rows)
     } catch (err) {
         return res.status(500).send(err)
     }
