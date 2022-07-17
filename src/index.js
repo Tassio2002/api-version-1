@@ -97,10 +97,9 @@ app.get('/profile/:user_id', async (req, res) => {
 app.delete('/user/:user_id', async (req, res) => {
     const { user_id } = req.params
     try {
-        const deletePaper = await pool.query('DELETE FROM users WHERE user_id = ($1) RETURNING *', [user_id])
+        await pool.query('DELETE FROM users WHERE user_id = ($1) RETURNING *', [user_id])
         return res.status(200).send({
             message: 'User successfully deleted',
-            deletePaper
         })
     } catch (err) {
         return res.status(400).send(err)
@@ -178,18 +177,16 @@ app.get('/authors/:user_id', verifyJWT, async (req, res) => {
     }
 })
 
-
 //Atualiza author {Só admin}
-//Fazer apenas uma query
 app.patch('/author/:user_id/:author_id', verifyJWT, async (req, res) => {
     const { user_id, author_id } = req.params
-    const data = req.body
+    const { author_name } = req.body
     try {
-        const updateAuthor = await pool.query('UPDATE authors SET author_name = ($1) WHERE author_id = ($2) RETURNING *',
-            [data.author_name, author_id])
+        const updateAuthor = await pool.query('UPDATE authors SET author_name = ($1) WHERE user_id = ($2) AND author_id = ($3) RETURNING *',
+            [author_name, user_id, author_id])
         return res.status(200).send(updateAuthor.rows)
     } catch (err) {
-        return res.status(400).send(err)
+        return res.status(400).send('teste')
     }
 })
 
@@ -199,8 +196,7 @@ app.delete('/author/:user_id/:author_id', verifyJWT, async (req, res) => {
     try {
         const deleteAuthor = await pool.query('DELETE FROM authors WHERE user_id = ($1) AND author_id = ($2) RETURNING *', [user_id,author_id])
         return res.status(200).send({
-            message: 'author successfully deleted',
-            deleteAuthor
+            message: 'author successfully deleted'
         })
     } catch (err) {
         return res.status(400).send(err)
@@ -255,8 +251,7 @@ app.delete('/paper/:user_id/:author_id/:paper_id', verifyJWT, async (req, res) =
     try {
         const deletePaper = await pool.query('DELETE FROM papers WHERE author_id = ($1) AND paper_id = ($2) RETURNING *', [author_id, paper_id])
         return res.status(200).send({
-            message: 'paper successfully deleted',
-            deletePaper
+            message: 'paper successfully deleted'
         })
     } catch (err) {
         return res.status(400).send(err)
