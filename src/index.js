@@ -153,8 +153,7 @@ app.use(route, async function (req, res, next) {
 //Cria um novo author {Só admin}
 app.post('/authors/:user_id', verifyJWT, async (req, res) => {
     try {
-        const { author_name } = req.body
-        const { user_id } = req.body
+        const { author_name, user_id } = req.body
         const newAuthor = await pool.query('INSERT INTO authors (author_name, user_id) VALUES ($1, $2) RETURNING *', [author_name, user_id])
         return res.status(200).send(newAuthor.rows)
     } catch (err) {
@@ -207,7 +206,7 @@ app.delete('/author/:user_id/:author_id', verifyJWT, async (req, res) => {
 
 //Cria paper por autor {Só admin}
 app.post('/paper/:user_id/:author_id', verifyJWT, async (req, res) => {
-    const { paper_title, paper_summary, author_id, user_id } = req.body//Colocar todos nesse formato
+    const { paper_title, paper_summary, author_id, user_id } = req.body
     try {
         const newPaper = await pool.query('INSERT INTO papers (paper_title, paper_summary, author_id, user_id) VALUES ($1, $2, $3, $4) RETURNING *',
             [paper_title, paper_summary, author_id, user_id])
@@ -219,8 +218,7 @@ app.post('/paper/:user_id/:author_id', verifyJWT, async (req, res) => {
 
 //Mostra todos os papers de um autor
 app.get('/papers/:user_id/:author_id', verifyJWT, async (req, res) => {
-    const { user_id } = req.params
-    const { author_id } = req.params
+    const { user_id, author_id } = req.params
     try {
         const allPapers = await pool.query('SELECT * FROM papers WHERE user_id = ($1) AND author_id = ($2)', [user_id, author_id])
         if (!allPapers.rows[0]) {
