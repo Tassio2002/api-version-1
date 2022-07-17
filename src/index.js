@@ -60,19 +60,6 @@ let interval = setInterval(() => {
     console.log("format: " + convertSecondsToTime(timeLeft))//apagar
 }, 1000)
 
-//Para fazer o patch é preciso enviar todos as colunas da tabela
-app.patch('/profile2/:user_id', async (req, res) => {
-    const { user_id } = req.params
-    const {user_type, user_email, password} = req.body
-    const {expirationTimeLeft} = convertSecondsToTime(timeLeft)
-    try {
-        const updateSessionExpiration = await pool.query('UPDATE users SET user_type, user_email, password, session_expiration = ($1, $2, $3, $4) WHERE author_id = ($5) RETURNING *',
-            [user_type, user_email, password, expirationTimeLeft, user_id])
-        return res.status(200).send(updateSessionExpiration.rows)
-    } catch (err) {
-        return res.status(400).send(err)
-    }
-})
 //Cria um novo usuário caso o email não esteja cadastrado anteriormente
 app.post('/signup', async (req, res) => {
     const { user_type } = req.body
@@ -107,6 +94,7 @@ app.post('/login', (req, res) => {
 app.get('/profile/:user_id', async (req, res) => {
     const { user_id } = req.params
     try {
+        await pool.query('UPDATE users SET session_expiration = ($1) WHERE user_id = ($2)', [convertSecondsToTime(timeLeft), user_id])
         const profile = await pool.query('SELECT * FROM users WHERE user_id = ($1)', [user_id])
         return res.status(200).send(profile.rows)
     } catch (err) {
