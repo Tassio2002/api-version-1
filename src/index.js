@@ -4,7 +4,8 @@ var router = express.Router();
 const { Pool } = require('pg')
 
 require('dotenv').config()
-const jwt = require('jsonwebtoken')
+const jwt = require('jsonwebtoken');
+const { query } = require('express');
 
 const PORT = 3333
 
@@ -67,16 +68,24 @@ app.post('/signup', async (req, res) => {
 })
 
 //login
-// colocar o user_email e a password em variáveis
-app.post('/login', (req, res) => {
-    if (req.body.user_email === "admin@gmail.com" && req.body.password === "admin123456") {
-        const { user_id } = req.body
-        const token = jwt.sign({ user_id }, process.env.SECRET, {
-            expiresIn: expirationTime
-        })
-        return res.json({ auth: true, token: token })
+//Tratar melhor esse erro
+app.post('/login', async (req, res) => {
+    const { user_id, user_email, password } = req.body
+    try {
+        const loginData = await pool.query('SELECT user_email, password FROM users WHERE user_email LIKE ($1) AND password LIKE ($2)',
+        [user_email, password])
+
+        if (!loginData.rows[0]) {
+            return res.status(400).send({message: 'Invalid login, incorrect email or password, please try again'})
+        } else {
+            const token = jwt.sign({ user_id }, process.env.SECRET, {
+                expiresIn: expirationTime
+            })
+            return res.json({ auth: true, token: token })
+        }
+    } catch (err) {
+        return res.status(500).send(err)
     }
-    res.status(500).json({ message: "Login inválido" })
 })
 
 //Vê todos os dados do usuário logado e o tempo até a expiração
