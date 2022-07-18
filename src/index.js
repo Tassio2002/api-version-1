@@ -93,7 +93,7 @@ app.get('/profile/:user_id', async (req, res) => {
 
 //Deleta user
 //verifyJWT
-app.delete('/user/:user_id', async (req, res) => {
+app.delete('/user/:user_id', verifyJWT, async (req, res) => {
     const { user_id } = req.params
     try {
         await pool.query('DELETE FROM users WHERE user_id = ($1) RETURNING *', [user_id])
@@ -116,8 +116,7 @@ app.get('/users', async (req, res) => {
 })
 
 //Só um user admin pode mudar o user type de um usario default
-//verifyJWT
-app.patch('/user/:user_id', async (req, res) => {
+app.patch('/user/:user_id', verifyJWT, async (req, res) => {
     const { user_id } = req.params
     const { user_name, user_type, password } = req.body
 
@@ -260,11 +259,8 @@ app.delete('/paper/:user_id/:author_id/:paper_id', verifyJWT, async (req, res) =
         return res.status(400).send(err)
     }
 })
-
-
-//adicionar verifyJWT
 //Tratar o caso de não ter nenhum autor para mostrar com rows.lenght = 0
-app.get('/search/author', async (req, res) => {
+app.get('/search/author', verifyJWT, async (req, res) => {
     const { author_search } = req.body
 
     try {
@@ -274,9 +270,8 @@ app.get('/search/author', async (req, res) => {
         return res.status(500).send(err)
     }
 })
-//adicionar verifyJWT
 //Tratar o caso de não ter nenhum autor para mostrar com rows.lenght = 0
-app.get('/search/paper', async (req, res) => {
+app.get('/search/paper', verifyJWT, async (req, res) => {
     const { paper_search } = req.body
 
     try {
@@ -286,7 +281,5 @@ app.get('/search/paper', async (req, res) => {
         return res.status(500).send(err)
     }
 })
-
-
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
