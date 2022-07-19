@@ -25,14 +25,15 @@ function verifyJWT(req, res, next) {
     if (!token) return res.status(401).json({ auth: false, message: 'No token provided.' })
 
     jwt.verify(token, process.env.SECRET, function (err, decoded) {
-        if (err) return res.status(500).json({ auth: false, message: 'Failed to authenticate token' })
+        if (err) return res.status(401).json({ auth: false, message: 'Failed to authenticate token' })
         req.user_id = decoded.id
         next()
     })
 }
 
-const expirationTime = 10800
-let timeLeft = expirationTime
+// Tempo de expiração da API key em segundos
+let expirationTime = 10800
+
 //Converte um numero inteiro em uma string formatada no formato HH:MM:SS
 function convertSecondsToTime(time) {
     let dateOBJ = new Date(time * 1000),
@@ -45,9 +46,9 @@ function convertSecondsToTime(time) {
 
 //Pega o tempo de expiração da chave de API e faz uma contagem regressiva
 let interval = setInterval(() => {
-    timeLeft -= 1
+    expirationTime -= 1
 
-    if (timeLeft <= 0) {clearInterval(interval)}
+    if (expirationTime <= 0) {clearInterval(interval)}
 
     convertSecondsToTime()
 }, 1000)
@@ -61,7 +62,7 @@ app.post('/signup', async (req, res) => {
         if (!user.rows[0]) {
             user = await pool.query('INSERT INTO users (user_name, user_type, user_email, password, session_expiration) VALUES ($1, $2, $3, $4, $5) RETURNING *', [user_name, user_type, user_email, password, convertSecondsToTime(expirationTime)])
         }
-        return res.status(200).send(user.rows)
+        return res.status(201).send(user.rows)
     } catch (err) {
         return res.status(400).send(err)
     }
@@ -76,7 +77,7 @@ app.post('/login', async (req, res) => {
         [user_email, password])
 
         if (!loginData.rows[0]) {
-            return res.status(400).send({message: 'Invalid login, incorrect email or password, please try again'})
+            return res.status(401).send({message: 'Invalid login, incorrect email or password, please try again'})
         } else {
             const token = jwt.sign({ user_id }, process.env.SECRET, {
                 expiresIn: expirationTime
@@ -92,7 +93,7 @@ app.post('/login', async (req, res) => {
 app.get('/profile/:user_id', async (req, res) => {
     const { user_id } = req.params
     try {
-        await pool.query('UPDATE users SET session_expiration = ($1) WHERE user_id = ($2)', [convertSecondsToTime(timeLeft), user_id])
+        await pool.query('UPDATE users SET session_expiration = ($1) WHERE user_id = ($2)', [convertSecondsToTime(expirationTime), user_id])
         const profile = await pool.query('SELECT * FROM users WHERE user_id = ($1)', [user_id])
         return res.status(200).send(profile.rows)
     } catch (err) {
@@ -145,14 +146,14 @@ app.use(route, async function (req, res, next) {
     try {
         const userType = await pool.query('SELECT user_type FROM users WHERE user_id = ($1)', [user_id])
         if (userType.rows[0].user_type == "admin") {
-            return res.status(200), next()
+            return res.status(202), next()
         } else {
-            return res.status(500).send({
+            return res.status(403).send({
                 message: 'This operation can only be done by an admin user.'
             })
         }
     } catch (err) {
-        return res.status(500).send({
+        return res.status(401).send({
             message: 'This user type does not belong to the system'
         })
     }
@@ -163,7 +164,7 @@ app.post('/authors/:user_id', verifyJWT, async (req, res) => {
     try {
         const { author_name, user_id } = req.body
         const newAuthor = await pool.query('INSERT INTO authors (author_name, user_id) VALUES ($1, $2) RETURNING *', [author_name, user_id])
-        return res.status(200).send(newAuthor.rows)
+        return res.status(201).send(newAuthor.rows)
     } catch (err) {
         return res.status(500).send({
             message: ''
@@ -177,7 +178,7 @@ app.get('/authors/:user_id', verifyJWT, async (req, res) => {
     try {
         const allAuthors = await pool.query('SELECT * FROM authors WHERE user_id = ($1)', [user_id])
         if (!allAuthors.rows[0]) {
-            return res.status(400).send({message: 'This user has no authors'})
+            return res.status(404).send({message: 'This user has no authors'})
         } else {
             return res.status(200).send(allAuthors.rows)
         }
@@ -218,7 +219,7 @@ app.post('/paper/:user_id/:author_id', verifyJWT, async (req, res) => {
     try {
         const newPaper = await pool.query('INSERT INTO papers (paper_title, paper_summary, author_id, user_id) VALUES ($1, $2, $3, $4) RETURNING *',
             [paper_title, paper_summary, author_id, user_id])
-        return res.status(200).send(newPaper.rows)
+        return res.status(201).send(newPaper.rows)
     } catch (err) {
         return res.status(400).send(err)
     }
@@ -230,7 +231,7 @@ app.get('/papers/:user_id/:author_id', verifyJWT, async (req, res) => {
     try {
         const allPapers = await pool.query('SELECT * FROM papers WHERE user_id = ($1) AND author_id = ($2)', [user_id, author_id])
         if (!allPapers.rows[0]) {
-            return res.status(400).send({message: 'This author has no papers'})
+            return res.status(404).send({message: 'This author has no papers'})
         } else {
             return res.status(200).send(allPapers.rows)
         }
@@ -268,24 +269,37 @@ app.delete('/paper/:user_id/:author_id/:paper_id', verifyJWT, async (req, res) =
         return res.status(400).send(err)
     }
 })
+
 //Tratar o caso de não ter nenhum autor para mostrar com rows.lenght = 0
 app.get('/search/author', verifyJWT, async (req, res) => {
     const { author_search } = req.body
 
     try {
         const searchAuthor = await pool.query('SELECT * FROM authors WHERE author_name LIKE ($1)', [`%${author_search}%`])
-        return res.status(200).send(searchAuthor.rows)
+        
+        if(searchAuthor.rows.length !== 0){
+            return res.status(200).send(searchAuthor.rows)
+        } else {
+            return res.status(404).send({message: 'No author found'})
+        }
     } catch (err) {
         return res.status(500).send(err)
     }
 })
+
 //Tratar o caso de não ter nenhum autor para mostrar com rows.lenght = 0
 app.get('/search/paper', verifyJWT, async (req, res) => {
     const { paper_search } = req.body
 
     try {
         const searchPaper = await pool.query('SELECT * FROM papers WHERE paper_title LIKE ($1) OR paper_summary LIKE ($1)', [`%${paper_search}%`])
-        return res.status(200).send(searchPaper.rows)
+        
+        if(searchPaper.rows.length !== 0){
+            return res.status(200).send(searchPaper.rows)
+        } else {
+            return res.status(404).send({message: 'No paper found'})
+        }
+
     } catch (err) {
         return res.status(500).send(err)
     }
