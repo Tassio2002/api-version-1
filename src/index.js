@@ -69,7 +69,6 @@ app.post('/signup', async (req, res) => {
 })
 
 //login
-//Tratar melhor esse erro
 app.post('/login', async (req, res) => {
     const { user_id, user_email, password } = req.body
     try {
@@ -102,7 +101,6 @@ app.get('/profile/:user_id', async (req, res) => {
 })
 
 //Deleta user
-//verifyJWT
 app.delete('/user/:user_id', verifyJWT, async (req, res) => {
     const { user_id } = req.params
     try {
@@ -125,7 +123,7 @@ app.get('/users', async (req, res) => {
     }
 })
 
-//Só um user admin pode mudar o user type de um usario default
+//Atualiza usuário
 app.patch('/user/:user_id', verifyJWT, async (req, res) => {
     const { user_id } = req.params
     const { user_name, user_type, password } = req.body
@@ -139,7 +137,6 @@ app.patch('/user/:user_id', verifyJWT, async (req, res) => {
     }
 })
 
-//Get all user não pode ser usado por default
 let route = ['/authors/:user_id', '/author/:user_id/:author_id', '/paper/:user_id/:author_id', '/papers/:user_id/:author_id', '/paper/:user_id/:author_id/:paper_id']
 app.use(route, async function (req, res, next) {
     const { user_id } = req.params
@@ -241,9 +238,6 @@ app.get('/papers/:user_id/:author_id', verifyJWT, async (req, res) => {
 })
 
 //Atualiza paper por autor {Só admin}
-//Não precisa mandar o author id no body da requisição
-//Permitir que o usuário consiga alterar apenas alguns dados
-//Verificar se o autor existe no banco de dados em caso de o usuário querer atualizar o autor
 app.patch('/paper/:user_id/:author_id/:paper_id', verifyJWT, async (req, res) => {
     const { author_id, paper_id } = req.params
     const { paper_title, paper_summary } = req.body
@@ -270,7 +264,7 @@ app.delete('/paper/:user_id/:author_id/:paper_id', verifyJWT, async (req, res) =
     }
 })
 
-//Tratar o caso de não ter nenhum autor para mostrar com rows.lenght = 0
+//Busca por autores
 app.get('/search/author', verifyJWT, async (req, res) => {
     const { author_search } = req.body
 
@@ -287,7 +281,7 @@ app.get('/search/author', verifyJWT, async (req, res) => {
     }
 })
 
-//Tratar o caso de não ter nenhum autor para mostrar com rows.lenght = 0
+//Busca por papers
 app.get('/search/paper', verifyJWT, async (req, res) => {
     const { paper_search } = req.body
 
