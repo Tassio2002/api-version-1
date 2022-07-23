@@ -1,5 +1,4 @@
-const express = require('express')
-const cors = require('cors')
+
 var router = express.Router();
 const { Pool } = require('pg')
 
@@ -137,7 +136,7 @@ app.patch('/user/:user_id', verifyJWT, async (req, res) => {
     }
 })
 
-let route = ['/author/:user_id', '/authors/:user_id', '/author/:user_id/:author_id', '/paper/:user_id/:author_id', '/papers/:user_id/:author_id', '/paper/:user_id/:author_id/:paper_id']
+let route = ['/authors/:user_id', '/author/:user_id/:author_id', '/paper/:user_id/:author_id', '/papers/:user_id/:author_id', '/paper/:user_id/:author_id/:paper_id']
 app.use(route, async function (req, res, next) {
     const { user_id } = req.params
     try {
@@ -157,7 +156,7 @@ app.use(route, async function (req, res, next) {
 })
 
 //Cria um novo author {Só admin}
-app.post('/author/:user_id', verifyJWT, async (req, res) => {
+app.post('/authors/:user_id', verifyJWT, async (req, res) => {
     try {
         const { author_name, user_id } = req.body
         const newAuthor = await pool.query('INSERT INTO authors (author_name, user_id) VALUES ($1, $2) RETURNING *', [author_name, user_id])
@@ -244,6 +243,7 @@ app.patch('/paper/:user_id/:author_id/:paper_id', verifyJWT, async (req, res) =>
     try {
         const updatePaper = await pool.query('UPDATE papers SET paper_title = ($1), paper_summary = ($2), author_id = ($3) WHERE paper_id = ($4) RETURNING *',
             [paper_title, paper_summary, author_id, paper_id])
+
         return res.status(200).send(updatePaper.rows)
     } catch (err) {
         return res.status(400).send(err)
