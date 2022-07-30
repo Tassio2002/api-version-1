@@ -15,5 +15,4 @@ client.connect(function(err){
     })
 })
 
-
 module.exports = client
