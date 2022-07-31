@@ -2,7 +2,6 @@ const { Router } = require('express')
 
 const { getAllUsers, patchUser, deleteUser, signup, profile, login } = require('../Controllers/UserController')
 const { verifyJWT } = require('../Services/api-key')
-
 const router = Router()
 
 router.get('/getusers', getAllUsers)

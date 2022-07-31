@@ -1,7 +1,8 @@
 const pool = require('../Database/DBConnection')
+let { convertSecondsToTime, expirationTime } = require('../Services/session-expiration')
+const { verifyJWT } = require('../Services/api-key')
 const jwt = require('jsonwebtoken')
 
-let { convertSecondsToTime, expirationTime } = require('../Services/session-expiration')
 
 
 //Pega o tempo de expiração da chave de API e faz uma contagem regressiva
