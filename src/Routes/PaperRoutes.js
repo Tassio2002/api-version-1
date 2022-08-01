@@ -4,9 +4,9 @@ const { createPaper, getPaper, updatePaper, deletePaper } = require('../Controll
 
 const router = Router()
 
-router.post('/paper', verifyJWT, createPaper)
+router.post('/paper/:user_id/:author_id', verifyJWT, createPaper)
 router.get('/papers/:user_id/:author_id', verifyJWT, getPaper)
-router.patch('/paper/:user_id/:author_id', verifyJWT, updatePaper)
-router.delete('/paper/:user_id/:author_id/:paper_id', deletePaper)
+router.patch('/paper/:user_id/:author_id/:paper_id', verifyJWT, updatePaper)
+router.delete('/paper/:user_id/:author_id/:paper_id', verifyJWT, deletePaper)
 
 module.exports = router
