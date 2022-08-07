@@ -9,17 +9,19 @@ const createAuthor = async (req, res) => {
         let id = newAuthor.rows[0].id
         let authorName = newAuthor.rows[0].author_name
         let pictureURL = newAuthor.rows[0].picture
-        return res.status(201).json({
+
+        resJSON = {
             "id": id,
             "author":{
                 "author_id": authorId,
                 "author_name": authorName,
                 "picture":pictureURL
             }
-        })
+        }
+        return res.status(201).json(resJSON)
     } catch (err) {
         return res.status(500).send({
-            message: ''
+            message: 'Unable to insert this author, check the request and try again'
         })
     }
 }
@@ -48,7 +50,7 @@ const getAuthors = async (req, res, next) => {
                 authorName = authors.rows[i].author_name
                 pictureURL = authors.rows[i].picture
 
-                let json = {
+                let resJSON = {
                     "id": id,
                     "author":{
                         "author_id": authorId,
@@ -56,9 +58,8 @@ const getAuthors = async (req, res, next) => {
                         "picture":pictureURL
                     }
                 }
-                allAuthors.push(json)
+                allAuthors.push(resJSON)
             }
-
             return res.status(200).json(allAuthors)
         }
     } catch (err) {
@@ -72,9 +73,23 @@ const updateAuthor = async (req, res) => {
     try {
         const updateAuthor = await pool.query('UPDATE authors SET author_name = ($1) WHERE user_id = ($2) AND author_id = ($3) RETURNING *',
             [author_name, user_id, author_id])
-        return res.status(200).send(updateAuthor.rows)
+        
+            let authorId = updateAuthor.rows[0].author_id
+            let id = updateAuthor.rows[0].id
+            let authorName = updateAuthor.rows[0].author_name
+            let pictureURL = updateAuthor.rows[0].picture
+    
+            resJSON = {
+                "id": id,
+                "author":{
+                    "author_id": authorId,
+                    "author_name": authorName,
+                    "picture":pictureURL
+                }
+            }
+        return res.status(200).send(resJSON)
     } catch (err) {
-        return res.status(400).send('teste')
+        return res.status(400).send(err)
     }
 }
 
