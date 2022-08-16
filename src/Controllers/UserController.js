@@ -1,6 +1,5 @@
 const pool = require('../Database/DBConnection')
 let { convertSecondsToTime, expirationTime } = require('../Services/session-expiration')
-const { verifyJWT } = require('../Services/api-key')
 const jwt = require('jsonwebtoken')
 
 //Pega o tempo de expiração da chave de API e faz uma contagem regressiva
@@ -36,7 +35,6 @@ const login = async (req, res) => {
     try {
         const loginData = await pool.query('SELECT user_email, password FROM users WHERE user_email LIKE ($1) AND password LIKE ($2)',
         [user_email, password])
-        console.log(loginData.rows[0])
         if (!loginData.rows[0]) {
             return res.status(401).send({message: 'Invalid login, incorrect email or password, please try again'})
         } else {
