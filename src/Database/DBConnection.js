@@ -1,6 +1,6 @@
 const pg = require('pg')
 
-let connString = "postgres://lawztqah:tp1Qu0TmxUksjeDgPpFL7HQs7dVyIFm0@kesavan.db.elephantsql.com/lawztqah"
+let connString = "postgres://txluvqcy:1bS-72MdK2n4NUn2YHDQTS-Ss0TQT32J@babar.db.elephantsql.com/txluvqcy"
 let client = new pg.Client(connString)
 
 client.connect(function(err){
